@@ -1,6 +1,7 @@
 package main
 
 import (
+	"book-tracker/internal/books/handlers"
 	"book-tracker/internal/db"
 	"log"
 	"net/http"
@@ -16,6 +17,10 @@ func main() {
 	
 	defer con.Close()
 
+	mux := http.NewServeMux()
+	mux.HandleFunc("/books", handlers.GetBooks)
+	mux.HandleFunc("/book", handlers.PostBook)
+
 	// Http handlers
-	log.Fatal(http.ListenAndServe(":1010", nil))
+	log.Fatal(http.ListenAndServe("0.0.0.0:1010", mux))
 }	

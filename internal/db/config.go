@@ -9,11 +9,12 @@ import (
 )
 
 var pool *sql.DB
+const dsn string = "demo.db" //"file:demo.db?cache=shared&mode=rwc"
 
 func init() {
 	var err error 
-	dsn := "demo.db"
 
+	// Opening database 
 	pool, err = sql.Open("sqlite", dsn)
 	if err != nil {
 		log.Fatalln(err)
