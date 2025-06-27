@@ -8,52 +8,27 @@ package rep
 import (
 	books "book-tracker/internal/books/models"
 	"database/sql"
-	"log"
-	"strings"
-	"sync"
+	"encoding/json"
 )
 
 func GetBooks(db *sql.DB) (*sql.Rows, error) {
-	st := `SELECT * FROM books;`
+	const st = `SELECT * FROM books;`
 	return db.Query(st)
 }
 
-var mut sync.Mutex
-
-func InsertBook(db *sql.DB, b *books.Book) (int32, error) {
-	st := `INSERT INTO books (title, authors, rate) 
+func InsertBook(tx *sql.Tx, b *books.Book) (*sql.Rows, error) {
+	const st = `INSERT INTO books (title, authors, rate) 
 		VALUES (?, ?, ?) RETURNING id;`
 
-	mut.Lock()
-	defer mut.Unlock()
-
-	insertBook, err := db.Prepare(st)
+	authors, err := json.Marshal(b.Authors)
 	if err != nil {
-		log.Printf("Prepare statement incorrect: %v\n", err)
-		return -1, err
+		return nil, err
 	}
 
-	defer insertBook.Close()
-
-	tx, err := db.Begin()
+	rows, err := tx.Query(st, b.Title, authors, b.Rate)
 	if err != nil {
-		log.Printf("Transaction fault: %v\n", err)
-		return -1, err
-	}
-
-	var id int32
-	err = tx.Stmt(insertBook).QueryRow(b.Title, strings.Join(b.Authors, ","), b.Rate).Scan(&id)
-	if err != nil {
-		tx.Rollback()
-		log.Printf("Insertion failed: %v\n", err)
-		return -1, err
-	}
+		return nil, err
+	}	
 	
-	if err := tx.Commit(); err != nil {
-		tx.Rollback()
-		log.Printf("Transaction commit failed: %v", err)
-		return -1, err
-	}
-
-	return id, nil
+	return rows, nil
 }

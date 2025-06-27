@@ -6,47 +6,60 @@ calling repository and transforming data
 package service
 
 import (
+	utils "book-tracker/internal/books"
 	books "book-tracker/internal/books/models"
 	rep "book-tracker/internal/books/repository"
-	"database/sql"
-	"fmt"
-	"log"
-	"strings"
+	"book-tracker/internal/db"
+	"encoding/json"
+	"net/http"
 )
 
-func GetBooks(db *sql.DB) ([]*books.Book, error) {
-	brows, err := rep.GetBooks(db)
+func GetBooks(w http.ResponseWriter, r *http.Request) {
+	// Gets connection 
+	con := db.GetConnection()
+
+	// Gets rows 
+	brows, err := rep.GetBooks(con)
 	if err != nil {
-		log.Printf("Error getting books: %v", err)
-		return nil, err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return 
 	}
-
+	// Defer rows close
 	defer brows.Close()
-
-	data := []*books.Book{}
-	for brows.Next() {
-		b := &books.Book{}
-
-		var authors string
-		if err := brows.Scan(&b.Id, &b.Title, &authors, &b.Rate); err != nil {
-			msg := fmt.Sprintf("Error while scanning: %v", err)
-			fmt.Println(msg)
-			continue
-		}
-
-		b.Authors = strings.Split(authors, ",")
-		data = append(data, b)
+	
+	// Build response
+	res, err := utils.MultipleRowsBuildResponse(brows)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	return data, nil
+	// Send response
+	json.NewEncoder(w).Encode(res)
 }
 
-func CreateBook(db *sql.DB, b *books.Book) (int32, error) {
-	id, err := rep.InsertBook(db, b)
+
+func CreateBook(w http.ResponseWriter, r *http.Request) {
+	// Gets connection 
+	con := db.GetConnection()
+	
+	// Build book
+	var book *books.Book
+	err := json.NewDecoder(r.Body).Decode(&book)
 	if err != nil {
-		log.Printf("Error inserting book: %v", err)
-		return -1, err
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return 
 	}
 
-	return id, nil
+	// Save book in transaction 
+	id, ok := utils.TryCreateBook(con, book)
+	if ! ok  {
+		http.Error(w, "Transaction fault", http.StatusInternalServerError)
+		return 
+	}
+
+	// Build response
+	res := utils.SingleIdResponse{Id: id}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

@@ -14,10 +14,10 @@ type Book struct {
 }
 
 func CreateBookTable(db *sql.DB) (sql.Result, error) {
-	st := `CREATE TABLE IF NOT EXISTS books (
+	const st = `CREATE TABLE IF NOT EXISTS books (
 			id 			INTEGER 	PRIMARY KEY,
 			title 	CHAR(50)	NOT NULL,
-			authors TEXT NOT 	NULL,
+			authors JSON 			NOT NULL,
 			rate 		INT 			CHECK(rate BETWEEN 0 and 5));`
 
 	return db.Exec(st)
